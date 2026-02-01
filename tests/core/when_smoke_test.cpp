@@ -13,7 +13,9 @@
  */
 #include <cassert>
 #include <chrono>
+#include <future>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <thread>
 #include <tuple>
@@ -29,7 +31,7 @@ using vix::async::core::task;
 using vix::async::core::when_all;
 using vix::async::core::when_any;
 
-// Helpers: drive a scheduler loop while awaiting a task
+// Helpers: run scheduler loop in background
 struct scheduler_runner
 {
   scheduler &sched;
@@ -50,57 +52,50 @@ struct scheduler_runner
   }
 };
 
+// sync_wait for task<T> that is scheduler-driven (no manual resume!)
 template <typename T>
-static T sync_await(task<T> t)
+static T sync_wait(scheduler &sched, task<T> t)
 {
-  struct runner
-  {
-    task<T> inner;
-    std::optional<T> value;
+  auto p = std::make_shared<std::promise<T>>();
+  auto fut = p->get_future();
 
-    task<void> run()
+  auto wrapper = [p, inner = std::move(t)]() mutable -> task<void>
+  {
+    try
     {
-      value = co_await inner;
-      co_return;
+      if constexpr (std::is_void_v<T>)
+      {
+        co_await inner;
+        p->set_value();
+      }
+      else
+      {
+        T v = co_await inner;
+        p->set_value(std::move(v));
+      }
     }
+    catch (...)
+    {
+      p->set_exception(std::current_exception());
+    }
+    co_return;
   };
 
-  runner r{std::move(t), std::nullopt};
-  auto top = r.run();
-  auto h = top.handle();
-  assert(h);
+  // start wrapper on the scheduler thread
+  std::move(wrapper()).start(sched);
 
-  while (!h.done())
-    h.resume();
-
-  assert(r.value.has_value());
-  return std::move(*r.value);
-}
-
-static void sync_await(task<void> t)
-{
-  struct runner
+  if constexpr (std::is_void_v<T>)
   {
-    task<void> inner;
-
-    task<void> run()
-    {
-      co_await inner;
-      co_return;
-    }
-  };
-
-  runner r{std::move(t)};
-  auto top = r.run();
-  auto h = top.handle();
-  assert(h);
-
-  while (!h.done())
-    h.resume();
+    fut.get();
+    return;
+  }
+  else
+  {
+    return fut.get();
+  }
 }
 
-// when_any compatibility helpers:
-// support tuple<optional<T>...> and tuple<T...>
+// when_any compatibility helpers
 template <typename X>
 static bool is_ready(const X &x)
 {
@@ -231,10 +226,10 @@ int main()
   scheduler sched;
   scheduler_runner run{sched};
 
-  sync_await(test_when_all_basic(sched));
-  sync_await(test_when_all_mixed_timing(sched));
-  sync_await(test_when_any_picks_first(sched));
-  sync_await(test_when_any_handles_immediate(sched));
+  sync_wait<void>(sched, test_when_all_basic(sched));
+  sync_wait<void>(sched, test_when_all_mixed_timing(sched));
+  sync_wait<void>(sched, test_when_any_picks_first(sched));
+  sync_wait<void>(sched, test_when_any_handles_immediate(sched));
 
   std::cout << "async_when_smoke: OK\n";
   return 0;
