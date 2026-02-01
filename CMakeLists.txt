@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
 
-# ----------------------------------------
-# Project
-# ----------------------------------------
 project(cnerium
   VERSION 0.1.0
   DESCRIPTION "Cnerium: async C++ core (scheduler, tasks, timers, cancellation)"
@@ -19,10 +16,70 @@ include(CneriumWarnings)
 include(CneriumSanitizers)
 
 # ----------------------------------------
+# Dependency options
+# ----------------------------------------
+option(CNERIUM_USE_BUNDLED_ASIO "Use vendored Asio from third_party/asio" ON)
+set(CNERIUM_ASIO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/asio"
+  CACHE PATH "Path to vendored Asio repository root"
+)
+
+# ----------------------------------------
+# Asio setup (no network)
+# Creates target: asio::asio
+# ----------------------------------------
+add_library(asio::asio INTERFACE IMPORTED GLOBAL)
+
+if(CNERIUM_USE_BUNDLED_ASIO)
+  # Expected structure: <root>/asio/include
+  set(_asio_include "${CNERIUM_ASIO_ROOT}/asio/include")
+  if(NOT EXISTS "${_asio_include}/asio.hpp")
+    message(FATAL_ERROR
+      "Bundled Asio not found.\n"
+      "Expected: ${_asio_include}/asio.hpp\n"
+      "Fix: git submodule update --init --recursive\n"
+      "Or set -DCNERIUM_USE_BUNDLED_ASIO=OFF to use system Asio."
+    )
+  endif()
+
+  set_target_properties(asio::asio PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${_asio_include}"
+  )
+else()
+  # System Asio (headers-only). We do not use find_package because Asio often has no config package.
+  find_path(ASIO_INCLUDE_DIR
+    NAMES asio.hpp
+    HINTS
+      /usr/include
+      /usr/local/include
+      $ENV{ASIO_ROOT}/include
+      $ENV{ASIO_ROOT}
+  )
+
+  if(NOT ASIO_INCLUDE_DIR)
+    message(FATAL_ERROR
+      "System Asio not found.\n"
+      "Install standalone Asio headers or enable bundled Asio:\n"
+      "  -DCNERIUM_USE_BUNDLED_ASIO=ON\n"
+      "Or provide -DASIO_INCLUDE_DIR=/path/to/asio/include"
+    )
+  endif()
+
+  set_target_properties(asio::asio PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${ASIO_INCLUDE_DIR}"
+  )
+endif()
+
+# Common Asio requirements
+target_compile_definitions(asio::asio INTERFACE ASIO_STANDALONE)
+
+if(UNIX AND NOT APPLE)
+  target_link_libraries(asio::asio INTERFACE pthread)
+endif()
+
+# ----------------------------------------
 # Library target
 # ----------------------------------------
 add_library(cnerium)
-
 add_library(cnerium::cnerium ALIAS cnerium)
 
 target_compile_features(cnerium PUBLIC cxx_std_20)
@@ -33,7 +90,6 @@ target_include_directories(cnerium
     $<INSTALL_INTERFACE:include>
 )
 
-# If you later want to split headers-only parts, keep this list explicit.
 target_sources(cnerium
   PRIVATE
     src/core/scheduler.cpp
@@ -60,18 +116,14 @@ target_sources(cnerium
       include/cnerium/core/spawn.hpp
 )
 
+# Link Asio target
+target_link_libraries(cnerium PUBLIC asio::asio)
+
 # ----------------------------------------
 # Warnings / sanitizers
 # ----------------------------------------
 cnerium_apply_warnings(cnerium)
 cnerium_apply_sanitizers(cnerium)
-
-# ----------------------------------------
-# Dependencies (placeholder)
-# ----------------------------------------
-# We keep it empty for now. Later, if you choose Asio standalone:
-# find_package(asio CONFIG REQUIRED)  # or FetchContent
-# target_link_libraries(cnerium PUBLIC asio::asio)
 
 # ----------------------------------------
 # Build settings
@@ -80,21 +132,6 @@ set_target_properties(cnerium PROPERTIES
   CXX_EXTENSIONS OFF
   POSITION_INDEPENDENT_CODE ON
 )
-
-include(FetchContent)
-
-FetchContent_Declare(
-  asio
-  GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
-  GIT_TAG asio-1-30-2
-)
-FetchContent_MakeAvailable(asio)
-
-target_compile_definitions(cnerium PUBLIC ASIO_STANDALONE)
-if(UNIX AND NOT APPLE)
-  target_link_libraries(cnerium PUBLIC pthread)
-endif()
-
 
 # ----------------------------------------
 # Tests / Examples
