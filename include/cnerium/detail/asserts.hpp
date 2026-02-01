@@ -1,4 +1,18 @@
-#pragma once
+/**
+ *
+ *  @file asserts.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_ASSERTS_HPP
+#define CNERIUM_ASSERTS_HPP
 
 #include <cstdlib>
 #include <iostream>
@@ -36,4 +50,6 @@ namespace cnerium::detail
 #else
 #define CNERIUM_ASSERT(expr) ((void)0)
 #define CNERIUM_ASSERT_MSG(expr, msg) ((void)0)
+#endif
+
 #endif

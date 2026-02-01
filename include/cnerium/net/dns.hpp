@@ -1,4 +1,18 @@
-#pragma once
+/**
+ *
+ *  @file dns.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_DNS_HPP
+#define CNERIUM_DNS_HPP
 
 #include <cstdint>
 #include <memory>
@@ -39,3 +53,5 @@ namespace cnerium::net
   std::unique_ptr<dns_resolver> make_dns_resolver(core::io_context &ctx);
 
 } // namespace cnerium::net
+
+#endif

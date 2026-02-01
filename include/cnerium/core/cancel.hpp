@@ -4,14 +4,15 @@
  *  @author Gaspard Kirira
  *
  *  Copyright 2025, Gaspard Kirira.  All rights reserved.
- *  https://github.com/vixcpp/vix
+ *  https://github.com/GaspardKirira/cnerium
  *  Use of this source code is governed by a MIT license
  *  that can be found in the License file.
  *
- *  Vix.cpp
+ *  CNERIUM
  *
  */
-#pragma once
+#ifndef CNERIUM_CANCEL_HPP
+#define CNERIUM_CANCEL_HPP
 
 #include <atomic>
 #include <memory>
@@ -81,10 +82,11 @@ namespace cnerium::core
     std::shared_ptr<cancel_state> st_;
   };
 
-  // Helper: translate cancellation to error_code (uniform behavior).
   inline std::error_code cancelled_ec() noexcept
   {
     return make_error_code(errc::canceled);
   }
 
 } // namespace cnerium::core
+
+#endif

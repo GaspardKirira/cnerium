@@ -1,4 +1,18 @@
-#pragma once
+/**
+ *
+ *  @file thread_pool.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_THREAD_POOL_HPP
+#define CNERIUM_THREAD_POOL_HPP
 
 #include <cstddef>
 #include <coroutine>
@@ -108,3 +122,5 @@ namespace cnerium::core
   };
 
 } // namespace cnerium::core
+
+#endif

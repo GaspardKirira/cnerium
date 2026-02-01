@@ -1,4 +1,18 @@
-#pragma once
+/**
+ *
+ *  @file tcp.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_TCP_HPP
+#define CNERIUM_TCP_HPP
 
 #include <cstddef>
 #include <cstdint>
@@ -50,3 +64,5 @@ namespace cnerium::net
   std::unique_ptr<tcp_listener> make_tcp_listener(core::io_context &ctx);
 
 } // namespace cnerium::net
+
+#endif

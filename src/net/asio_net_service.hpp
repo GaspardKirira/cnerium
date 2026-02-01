@@ -1,4 +1,19 @@
-#pragma once
+/**
+ *
+ *  @file asio_net_service.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_ASIO_NET_SERVICE_HPP
+#define CNERIUM_ASIO_NET_SERVICE_HPP
+
 #include <asio/io_context.hpp>
 #include <asio/executor_work_guard.hpp>
 
@@ -35,3 +50,5 @@ namespace cnerium::net::detail
     std::atomic_bool stopped_{false};
   };
 }
+
+#endif

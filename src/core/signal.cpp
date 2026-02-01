@@ -1,3 +1,16 @@
+/**
+ *
+ *  @file signal.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
 #include <cnerium/core/signal.hpp>
 #include <cnerium/core/io_context.hpp>
 

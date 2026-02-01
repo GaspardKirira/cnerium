@@ -1,4 +1,18 @@
-#pragma once
+/**
+ *
+ *  @file task.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_TASK_HPP
+#define CNERIUM_TASK_HPP
 
 #include <coroutine>
 #include <exception>
@@ -11,7 +25,6 @@
 
 namespace cnerium::core
 {
-
   template <typename T>
   class task;
 
@@ -22,27 +35,32 @@ namespace cnerium::core
       std::coroutine_handle<> continuation{};
       std::exception_ptr exception{};
 
+      // True if the task was started via start() and released ownership.
+      // In that case, the coroutine must self-destroy at final_suspend.
+      bool detached{false};
+
       std::suspend_always initial_suspend() noexcept { return {}; }
 
       struct final_awaiter
       {
-        bool await_ready() noexcept
-        {
-          return false;
-        }
+        bool await_ready() noexcept { return false; }
 
         template <typename Promise>
         std::coroutine_handle<> await_suspend(std::coroutine_handle<Promise> h) noexcept
         {
-          auto cont = h.promise().continuation;
+          auto &p = h.promise();
 
-          if (!cont)
-          {
+          // Resume continuation if present.
+          if (p.continuation)
+            return p.continuation;
+
+          // No continuation:
+          // - if detached, nobody owns the handle anymore -> self destroy
+          // - otherwise, the owning task object will destroy it safely
+          if (p.detached)
             h.destroy();
-            return std::noop_coroutine();
-          }
 
-          return cont;
+          return std::noop_coroutine();
         }
 
         void await_resume() noexcept {}
@@ -110,7 +128,7 @@ namespace cnerium::core
         else
         {
           assert(p.value.has_value());
-          return std::move(*(p.value));
+          return std::move(*p.value);
         }
       }
     };
@@ -153,24 +171,13 @@ namespace cnerium::core
 
     handle_type handle() const noexcept { return h_; }
 
-    // Start this task on a scheduler thread.
-    // Important: this consumes the task object (rvalue) because the task must stay alive
-    // while running. So you typically do:
-    //   auto t = foo();
-    //   std::move(t).start(sched);
-    void start(scheduler &s) && noexcept
-    {
-      auto h = h_;
-      h_ = {};
-      if (h)
-        s.post(h);
-    }
-
+    // Start on scheduler and detach ownership (self-destroy at final_suspend).
     void start(scheduler &sched) && noexcept
     {
       if (!h_)
         return;
 
+      h_.promise().detached = true;
       sched.post(std::coroutine_handle<>(h_));
       h_ = {};
     }
@@ -224,19 +231,12 @@ namespace cnerium::core
 
     handle_type handle() const noexcept { return h_; }
 
-    void start(scheduler &s) && noexcept
-    {
-      auto h = h_;
-      h_ = {};
-      if (h)
-        s.post(h);
-    }
-
     void start(scheduler &sched) && noexcept
     {
       if (!h_)
         return;
 
+      h_.promise().detached = true;
       sched.post(std::coroutine_handle<>(h_));
       h_ = {};
     }
@@ -271,3 +271,5 @@ namespace cnerium::core
   } // namespace detail
 
 } // namespace cnerium::core
+
+#endif

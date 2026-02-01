@@ -1,15 +1,24 @@
-#pragma once
+/**
+ *
+ *  @file traits.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_TRAITS_HPP
+#define CNERIUM_TRAITS_HPP
 
 #include <type_traits>
 #include <utility>
 
 namespace cnerium::detail
 {
-
-  // ================================
-  // Type traits shortcuts
-  // ================================
-
   template <typename T>
   using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
@@ -19,10 +28,6 @@ namespace cnerium::detail
   template <typename T>
   inline constexpr bool is_nothrow_move_v = std::is_nothrow_move_constructible_v<T>;
 
-  // ================================
-  // Callable detection
-  // ================================
-
   template <typename F, typename... Args>
   using is_invocable = std::is_invocable<F, Args...>;
 
@@ -30,3 +35,5 @@ namespace cnerium::detail
   inline constexpr bool is_invocable_v = is_invocable<F, Args...>::value;
 
 } // namespace cnerium::detail
+
+#endif

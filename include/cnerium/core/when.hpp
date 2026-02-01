@@ -1,11 +1,28 @@
-#pragma once
+/**
+ *
+ *  @file when.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_WHEN_HPP
+#define CNERIUM_WHEN_HPP
 
 #include <atomic>
+#include <coroutine>
 #include <exception>
+#include <memory>
 #include <optional>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 #include <cnerium/core/task.hpp>
 #include <cnerium/core/scheduler.hpp>
@@ -29,34 +46,44 @@ namespace cnerium::core
     template <typename T>
     using stored_t = typename stored<T>::type;
 
-    // store_value
-    template <typename T, typename U>
-    inline void store_value(stored_t<T> &dst, U &&v)
-    {
-      using V = std::decay_t<T>;
-      dst.emplace(static_cast<V>(std::forward<U>(v)));
-    }
-
-    inline void store_value(stored_t<void> &dst)
-    {
-      dst.emplace(std::monostate{});
-    }
-
-    // take_value
+    // Store a result into optional slot
     template <typename T>
-    inline std::decay_t<T> take_value(stored_t<T> &src)
+    inline void store_into(stored_t<T> &slot, std::decay_t<T> &&v)
     {
-      return std::move(*src);
+      slot.emplace(std::move(v));
     }
 
-    inline void take_value(stored_t<void> &)
+    inline void store_into(stored_t<void> &slot)
     {
+      slot.emplace(std::monostate{});
     }
 
-  } // namespace detail
+    // Materialize optional slot into plain value/monostate (used by when_any)
+    template <typename T>
+    inline std::decay_t<T> materialize_one(stored_t<T> &slot)
+    {
+      return std::move(*slot);
+    }
 
-  namespace detail
-  {
+    inline std::monostate materialize_one(stored_t<void> &)
+    {
+      return std::monostate{};
+    }
+
+    // Build tuple<conditional<is_void, monostate, Ts>...> from tuple<stored_t<Ts>...>
+    template <typename... Ts, std::size_t... Is>
+    inline auto materialize_tuple_impl(std::tuple<stored_t<Ts>...> raw, std::index_sequence<Is...>)
+    {
+      using Out = std::tuple<std::conditional_t<std::is_void_v<Ts>, std::monostate, Ts>...>;
+      return Out(materialize_one<Ts>(std::get<Is>(raw))...);
+    }
+
+    template <typename... Ts>
+    inline auto materialize_tuple(std::tuple<stored_t<Ts>...> raw)
+    {
+      return materialize_tuple_impl<Ts...>(std::move(raw), std::index_sequence_for<Ts...>{});
+    }
+
     template <typename... Ts>
     struct when_all_state
     {
@@ -64,7 +91,6 @@ namespace cnerium::core
       std::atomic<std::size_t> remaining{sizeof...(Ts)};
       std::coroutine_handle<> cont{};
       std::exception_ptr first_ex{};
-
       std::tuple<stored_t<Ts>...> results{};
     };
 
@@ -76,17 +102,16 @@ namespace cnerium::core
         if constexpr (std::is_void_v<T>)
         {
           co_await t;
+          store_into<T>(std::get<I>(st->results));
         }
         else
         {
           auto v = co_await t;
-          auto &slot = std::get<I>(st->results);
-          slot.emplace(std::move(v));
+          store_into<T>(std::get<I>(st->results), std::move(v));
         }
       }
       catch (...)
       {
-        // keep the first exception only
         if (!st->first_ex)
           st->first_ex = std::current_exception();
       }
@@ -107,7 +132,6 @@ namespace cnerium::core
     {
       scheduler *sched{};
       std::tuple<task<Ts>...> tasks;
-
       std::shared_ptr<when_all_state<Ts...>> st{};
 
       bool await_ready() const noexcept { return false; }
@@ -117,8 +141,6 @@ namespace cnerium::core
         st = std::make_shared<when_all_state<Ts...>>();
         st->sched = sched;
         st->cont = h;
-
-        // Start all runners on scheduler
         start_all(std::make_index_sequence<sizeof...(Ts)>{});
       }
 
@@ -127,14 +149,8 @@ namespace cnerium::core
         if (st->first_ex)
           std::rethrow_exception(st->first_ex);
 
-        if constexpr (sizeof...(Ts) == 0)
-        {
-          return std::tuple<>{};
-        }
-        else
-        {
-          return take_results(std::make_index_sequence<sizeof...(Ts)>{});
-        }
+        // Return normalized tuple directly (no normalize_tuple helper needed)
+        return materialize_tuple<Ts...>(std::move(st->results));
       }
 
     private:
@@ -150,75 +166,8 @@ namespace cnerium::core
         auto runner = when_all_runner<I, T, Ts...>(st, std::move(t));
         std::move(runner).start(*sched);
       }
-
-      template <std::size_t... Is>
-      auto take_results(std::index_sequence<Is...>)
-      {
-        return std::tuple<decltype(result_take_one<Is, Ts>())...>{
-            result_take_one<Is, Ts>()...};
-      }
-
-      template <std::size_t I, typename T>
-      auto result_take_one()
-      {
-        if constexpr (std::is_void_v<T>)
-        {
-          return;
-        }
-        else
-        {
-          auto &slot = std::get<I>(st->results);
-          return std::move(*slot);
-        }
-      }
     };
-  } // namespace detail
 
-  template <typename... Ts>
-  task<std::tuple<std::conditional_t<std::is_void_v<Ts>, std::monostate, Ts>...>>
-  when_all(scheduler &sched, task<Ts>... ts)
-  {
-    co_await sched.schedule();
-
-    detail::when_all_awaitable<Ts...> aw{
-        &sched,
-        std::tuple<task<Ts>...>{std::move(ts)...}};
-
-    auto raw = co_await aw;
-
-    auto norm = normalize_tuple<Ts...>(std::move(raw));
-    co_return norm;
-  }
-
-  namespace detail
-  {
-    template <typename... Ts, std::size_t... Is>
-    static auto normalize_tuple_impl(std::tuple<Ts...> in, std::index_sequence<Is...>)
-    {
-      return std::tuple<std::conditional_t<std::is_void_v<Ts>, std::monostate, Ts>...>{
-          normalize_one<Ts>(std::get<Is>(in))...};
-    }
-
-    template <typename T>
-    static auto normalize_one(T &v)
-    {
-      return std::move(v);
-    }
-
-    static auto normalize_one(void)
-    {
-      return std::monostate{};
-    }
-  } // namespace detail
-
-  template <typename... Ts>
-  static auto normalize_tuple(std::tuple<Ts...> in)
-  {
-    return detail::normalize_tuple_impl<Ts...>(std::move(in), std::index_sequence_for<Ts...>{});
-  }
-
-  namespace detail
-  {
     template <typename... Ts>
     struct when_any_state
     {
@@ -226,7 +175,6 @@ namespace cnerium::core
       std::atomic<bool> done{false};
       std::coroutine_handle<> cont{};
       std::exception_ptr ex{};
-
       std::size_t index{static_cast<std::size_t>(-1)};
       std::tuple<stored_t<Ts>...> results{};
     };
@@ -239,12 +187,12 @@ namespace cnerium::core
         if constexpr (std::is_void_v<T>)
         {
           co_await t;
+          store_into<T>(std::get<I>(st->results));
         }
         else
         {
           auto v = co_await t;
-          auto &slot = std::get<I>(st->results);
-          slot.emplace(std::move(v));
+          store_into<T>(std::get<I>(st->results), std::move(v));
         }
       }
       catch (...)
@@ -271,7 +219,6 @@ namespace cnerium::core
     {
       scheduler *sched{};
       std::tuple<task<Ts>...> tasks;
-
       std::shared_ptr<when_any_state<Ts...>> st{};
 
       bool await_ready() const noexcept { return false; }
@@ -281,7 +228,6 @@ namespace cnerium::core
         st = std::make_shared<when_any_state<Ts...>>();
         st->sched = sched;
         st->cont = h;
-
         start_all(std::make_index_sequence<sizeof...(Ts)>{});
       }
 
@@ -307,9 +253,25 @@ namespace cnerium::core
         std::move(runner).start(*sched);
       }
     };
+
   } // namespace detail
 
-  // when_any: returns {index, valueTuple}. For void tasks, slot is monostate.
+  // when_all: returns tuple<Ts...> with void mapped to monostate
+  template <typename... Ts>
+  task<std::tuple<std::conditional_t<std::is_void_v<Ts>, std::monostate, Ts>...>>
+  when_all(scheduler &sched, task<Ts>... ts)
+  {
+    co_await sched.schedule();
+
+    detail::when_all_awaitable<Ts...> aw{
+        &sched,
+        std::tuple<task<Ts>...>{std::move(ts)...}};
+
+    auto out = co_await aw;
+    co_return out;
+  }
+
+  // when_any: returns {index, tuple<Ts...>} with void mapped to monostate
   template <typename... Ts>
   task<std::pair<std::size_t, std::tuple<std::conditional_t<std::is_void_v<Ts>, std::monostate, Ts>...>>>
   when_any(scheduler &sched, task<Ts>... ts)
@@ -322,36 +284,15 @@ namespace cnerium::core
 
     auto [idx, raw] = co_await aw;
 
-    // Convert optional<T> storage into plain Ts/monostate.
-    auto out = materialize_tuple<Ts...>(std::move(raw));
-    co_return {idx, std::move(out)};
-  }
+    using OutTuple = std::tuple<std::conditional_t<std::is_void_v<Ts>, std::monostate, Ts>...>;
+    using Ret = std::pair<std::size_t, OutTuple>;
 
-  namespace detail
-  {
-    template <typename... Ts, std::size_t... Is>
-    static auto materialize_tuple_impl(std::tuple<stored_t<Ts>...> raw, std::index_sequence<Is...>)
-    {
-      return std::tuple<std::conditional_t<std::is_void_v<Ts>, std::monostate, Ts>...>{
-          materialize_one<Ts>(std::get<Is>(raw))...};
-    }
-
-    template <typename T>
-    static auto materialize_one(std::optional<T> &slot)
-    {
-      return std::move(*slot);
-    }
-
-    static auto materialize_one(std::monostate &)
-    {
-      return std::monostate{};
-    }
-  } // namespace detail
-
-  template <typename... Ts>
-  static auto materialize_tuple(std::tuple<detail::stored_t<Ts>...> raw)
-  {
-    return detail::materialize_tuple_impl<Ts...>(std::move(raw), std::index_sequence_for<Ts...>{});
+    Ret r;
+    r.first = idx;
+    r.second = detail::materialize_tuple<Ts...>(std::move(raw));
+    co_return r;
   }
 
 } // namespace cnerium::core
+
+#endif

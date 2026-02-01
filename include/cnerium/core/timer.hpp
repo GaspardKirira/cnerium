@@ -1,4 +1,18 @@
-#pragma once
+/**
+ *
+ *  @file timer.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_TIMER_HPP
+#define CNERIUM_TIMER_HPP
 
 #include <chrono>
 #include <coroutine>
@@ -97,3 +111,5 @@ namespace cnerium::core
   };
 
 } // namespace cnerium::core
+
+#endif

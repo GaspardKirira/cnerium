@@ -1,4 +1,18 @@
-#pragma once
+/**
+ *
+ *  @file log.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  https://github.com/GaspardKirira/cnerium
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  CNERIUM
+ *
+ */
+#ifndef CNERIUM_LOG_HPP
+#define CNERIUM_LOG_HPP
 
 #include <atomic>
 #include <chrono>
@@ -107,3 +121,5 @@ namespace cnerium::detail
 #define CNERIUM_LOG_FATAL(msg) ::cnerium::detail::log(::cnerium::detail::log_level::fatal, msg)
 
 } // namespace cnerium::detail
+
+#endif
