@@ -1,0 +1,184 @@
+#include <cnerium/core/timer.hpp>
+#include <cnerium/core/io_context.hpp>
+
+#include <functional>
+#include <system_error>
+
+namespace cnerium::core
+{
+
+  timer::timer(io_context &ctx)
+      : ctx_(ctx),
+        worker_([this]()
+                { timer_loop(); })
+  {
+  }
+
+  timer::~timer()
+  {
+    stop();
+    if (worker_.joinable())
+      worker_.join();
+  }
+
+  void timer::stop() noexcept
+  {
+    {
+      std::lock_guard<std::mutex> lock(m_);
+      stop_ = true;
+
+      // Best-effort: clear pending timers
+      q_.clear();
+    }
+    cv_.notify_all();
+  }
+
+  void timer::schedule(time_point tp, std::unique_ptr<job> j, cancel_token ct)
+  {
+    if (!j)
+      return;
+
+    {
+      std::lock_guard<std::mutex> lock(m_);
+      if (stop_)
+        return;
+
+      entry e;
+      e.when = tp;
+      e.id = ++seq_;
+      e.ct = std::move(ct);
+      e.j = std::move(j);
+
+      q_.insert(std::move(e));
+    }
+
+    cv_.notify_all();
+  }
+
+  task<void> timer::sleep_for(duration d, cancel_token ct)
+  {
+    struct awaitable
+    {
+      timer *self;
+      duration d;
+      cancel_token ct;
+
+      bool await_ready() const noexcept { return d.count() == 0; }
+
+      void await_suspend(std::coroutine_handle<> h)
+      {
+        self->after(d, [h]() mutable
+                    { if (h) h.resume(); }, ct);
+      }
+
+      void await_resume()
+      {
+        if (ct.is_cancelled())
+          throw std::system_error(cancelled_ec());
+      }
+    };
+
+    co_return co_await awaitable{this, d, std::move(ct)};
+  }
+
+  void timer::ctx_post(std::function<void()> fn)
+  {
+    ctx_.post(std::move(fn));
+  }
+
+  void timer::timer_loop()
+  {
+    while (true)
+    {
+      entry next{};
+      bool has_next = false;
+
+      {
+        std::unique_lock<std::mutex> lock(m_);
+
+        // Wait until there is at least one timer or stop is requested.
+        cv_.wait(lock, [&]()
+                 { return stop_ || !q_.empty(); });
+
+        if (stop_)
+        {
+          break;
+        }
+
+        // Get earliest deadline
+        auto it = q_.begin();
+        next = entry{it->when, it->id, it->ct, nullptr};
+        // Move job out
+        next.j = std::move(const_cast<entry &>(*it).j);
+        q_.erase(it);
+        has_next = true;
+      }
+
+      if (!has_next)
+        continue;
+
+      // Sleep until deadline (with wake-ups if new earlier timers appear)
+      while (true)
+      {
+        auto now = clock::now();
+        if (now >= next.when)
+          break;
+
+        std::unique_lock<std::mutex> lock(m_);
+        if (stop_)
+          return;
+
+        // If a new timer arrives with an earlier deadline, we should switch.
+        if (!q_.empty())
+        {
+          auto it = q_.begin();
+          if (it->when < next.when)
+          {
+            // Put current back and take the earlier one
+            q_.insert(entry{next.when, next.id, next.ct, std::move(next.j)});
+
+            next = entry{it->when, it->id, it->ct, nullptr};
+            next.j = std::move(const_cast<entry &>(*it).j);
+            q_.erase(it);
+            continue;
+          }
+        }
+
+        cv_.wait_until(lock, next.when, [&]()
+                       { return stop_; });
+        if (stop_)
+          return;
+      }
+
+      // Deliver on event loop
+      if (next.ct.is_cancelled())
+      {
+        // canceled: do nothing (v0). Later: notify awaiters with error_code.
+        continue;
+      }
+
+      if (next.j)
+      {
+        auto job_ptr = std::move(next.j);
+        ctx_post([j = std::move(job_ptr)]() mutable
+                 {
+        if (j)
+          j->run(); });
+      }
+    }
+  }
+
+  // ---------------------------
+  // io_context lazy subsystem
+  // ---------------------------
+
+  timer &io_context::timers()
+  {
+    if (!timer_)
+    {
+      timer_ = std::make_unique<timer>(*this);
+    }
+    return *timer_;
+  }
+
+} // namespace cnerium::core

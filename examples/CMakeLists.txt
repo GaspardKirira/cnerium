@@ -1,0 +1,35 @@
+cmake_minimum_required(VERSION 3.20)
+
+# examples/CMakeLists.txt
+
+add_executable(cnerium_example_00_hello_task
+  00_hello_task.cpp
+)
+
+target_link_libraries(cnerium_example_00_hello_task
+  PRIVATE cnerium::cnerium
+)
+
+cnerium_apply_warnings(cnerium_example_00_hello_task)
+cnerium_apply_sanitizers(cnerium_example_00_hello_task)
+
+add_executable(cnerium_example_01_signal_stop
+  01_signal_stop.cpp
+)
+target_link_libraries(cnerium_example_01_signal_stop PRIVATE cnerium::cnerium)
+cnerium_apply_warnings(cnerium_example_01_signal_stop)
+cnerium_apply_sanitizers(cnerium_example_01_signal_stop)
+
+add_executable(cnerium_example_01_timer
+  01_timer.cpp
+)
+target_link_libraries(cnerium_example_01_timer PRIVATE cnerium::cnerium)
+cnerium_apply_warnings(cnerium_example_01_timer)
+cnerium_apply_sanitizers(cnerium_example_01_timer)
+
+add_executable(cnerium_example_02_thread_pool
+  02_thread_pool.cpp
+)
+target_link_libraries(cnerium_example_02_thread_pool PRIVATE cnerium::cnerium)
+cnerium_apply_warnings(cnerium_example_02_thread_pool)
+cnerium_apply_sanitizers(cnerium_example_02_thread_pool)
