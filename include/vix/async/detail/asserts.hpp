@@ -3,8 +3,10 @@
  *  @file asserts.hpp
  *  @author Gaspard Kirira
  *
- *  Copyright 2025, Gaspard Kirira.  All rights reserved.
+ *  Copyright 2025, Gaspard Kirira.
+ *  All rights reserved.
  *  https://github.com/vixcpp/vix
+ *
  *  Use of this source code is governed by a MIT license
  *  that can be found in the License file.
  *
@@ -21,7 +23,18 @@
 
 namespace vix::async::detail
 {
-
+  /**
+   * @brief Fail-fast assertion handler.
+   *
+   * Prints a standardized assertion failure message to stderr and aborts.
+   * This function is used by ASYNC_ASSERT / ASYNC_ASSERT_MSG when
+   * ASYNC_ENABLE_ASSERTS is enabled.
+   *
+   * @param expr Failed expression as a string.
+   * @param file Source file where the assertion failed.
+   * @param line Source line where the assertion failed.
+   * @param msg Optional custom message (may be null).
+   */
   [[noreturn]] inline void assert_fail(
       const char *expr,
       const char *file,
@@ -40,6 +53,28 @@ namespace vix::async::detail
 
 } // namespace vix::async::detail
 
+/**
+ * @def ASYNC_ASSERT(expr)
+ * @brief Public assertion macro for the async module.
+ *
+ * When ASYNC_ENABLE_ASSERTS is enabled, evaluates @p expr and aborts the
+ * program if it is false. When disabled, the macro compiles to a no-op.
+ *
+ * @param expr Expression to validate.
+ */
+
+/**
+ * @def ASYNC_ASSERT_MSG(expr, msg)
+ * @brief Public assertion macro with a custom message for the async module.
+ *
+ * When ASYNC_ENABLE_ASSERTS is enabled, evaluates @p expr and aborts the
+ * program if it is false, printing the provided message. When disabled,
+ * the macro compiles to a no-op.
+ *
+ * @param expr Expression to validate.
+ * @param msg Message to print on failure.
+ */
+
 // Public assertion macro
 #if ASYNC_ENABLE_ASSERTS
 #define ASYNC_ASSERT(expr) \
@@ -52,4 +87,4 @@ namespace vix::async::detail
 #define ASYNC_ASSERT_MSG(expr, msg) ((void)0)
 #endif
 
-#endif
+#endif // VIX_ASYNC_ASSERTS_HPP
