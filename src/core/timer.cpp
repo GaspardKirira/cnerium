@@ -17,6 +17,7 @@
 #include <functional>
 #include <system_error>
 #include <memory>
+#include <thread>
 
 namespace vix::async::core
 {

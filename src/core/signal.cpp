@@ -175,14 +175,14 @@ namespace vix::async::core
       }
 
       sigset_t set;
-      ::sigemptyset(&set);
+      sigemptyset(&set);
       for (int s : sigs_copy)
-        ::sigaddset(&set, s);
+        sigaddset(&set, s);
 
-      ::pthread_sigmask(SIG_BLOCK, &set, nullptr);
+      pthread_sigmask(SIG_BLOCK, &set, nullptr);
 
       int received = 0;
-      int rc = ::sigwait(&set, &received);
+      int rc = sigwait(&set, &received);
 
       if (rc != 0)
       {
