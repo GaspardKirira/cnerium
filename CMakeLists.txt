@@ -75,11 +75,15 @@ endfunction()
 # Common Asio requirements
 function(vix_async_apply_asio_common onto link_scope)
   target_compile_definitions(${onto} ${link_scope} ASIO_STANDALONE=1)
+
+  if (WIN32)
+    target_compile_definitions(${onto} ${link_scope} _WIN32_WINNT=0x0A00)
+  endif()
+
   if (UNIX AND NOT APPLE)
     target_link_libraries(${onto} ${link_scope} pthread)
   endif()
 endfunction()
-
 # ----------------------------------------------------
 # Library target
 # ----------------------------------------------------
