@@ -69,19 +69,19 @@ namespace vix::async::detail
     switch (lvl)
     {
     case log_level::trace:
-      return "TRACE";
+      return "Trace";
     case log_level::debug:
-      return "DEBUG";
+      return "Debug";
     case log_level::info:
-      return "INFO";
+      return "Info";
     case log_level::warn:
-      return "WARN";
+      return "Warn";
     case log_level::error:
-      return "ERROR";
+      return "Error";
     case log_level::fatal:
-      return "FATAL";
+      return "Fatal";
     default:
-      return "OFF";
+      return "Of";
     }
   }
 
