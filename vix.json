@@ -1,0 +1,27 @@
+{
+  "name": "async",
+  "namespace": "vix",
+  "version": "0.1.0",
+  "type": "header-and-source",
+  "include": "include",
+  "src": "src",
+  "license": "MIT",
+  "description": "Low-level async runtime (scheduler, coroutines, timers, thread pool) for Vix.cpp",
+  "keywords": [
+    "cpp",
+    "vix",
+    "async",
+    "coroutines",
+    "scheduler",
+    "thread-pool",
+    "timers",
+    "runtime"
+  ],
+  "repository": "https://github.com/vixcpp/async",
+  "authors": [
+    {
+      "name": "Gaspard Kirira",
+      "github": "Gaspardkirira"
+    }
+  ]
+}
