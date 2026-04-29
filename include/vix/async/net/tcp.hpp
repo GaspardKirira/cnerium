@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <system_error>
 
@@ -131,6 +132,22 @@ namespace vix::async::net
      * @return true if the stream is open, false otherwise.
      */
     virtual bool is_open() const noexcept = 0;
+
+    /**
+     * @brief Return the native socket handle when supported.
+     *
+     * This is mainly used by transport adapters that need access to the
+     * underlying platform socket, such as TLS backends.
+     *
+     * @return Native socket handle.
+     *
+     * @throws std::runtime_error If the implementation does not expose it.
+     */
+    virtual int native_handle()
+    {
+      throw std::runtime_error(
+          "tcp_stream implementation does not expose a native socket handle");
+    }
   };
 
   /**

@@ -167,6 +167,11 @@ namespace vix::async::net
       return sock_;
     }
 
+    int native_handle() override
+    {
+      return static_cast<int>(sock_.native_handle());
+    }
+
   private:
     core::io_context &ctx_;
     tcp::socket sock_;
